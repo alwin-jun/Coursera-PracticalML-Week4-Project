@@ -1,0 +1,85 @@
+---
+title: "Practical ML: Week 4 Project"
+author: "CJ"
+date: "July 27, 2018"
+output: html_document
+---
+
+### Project Background
+
+######## Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).  
+
+
+##### Data Load / Input
+```{r}
+library(caret)
+
+# Use URL the project material provided
+URL1 = "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+URL2 = "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+```
+
+##### Read CVS Data
+```{r}
+training_raw = read.csv(url(URL1))
+validation_raw = read.csv(url(URL2))
+```
+
+##### Data Clean Up
+```{r}
+# Remove Variables with zero variance
+training_nzv = nearZeroVar(training_raw, saveMetrics = T)
+training_raw2 = training_raw[,training_nzv$nzv== F]
+
+# Also we need to Remove Variables which are mostly NA, say 80%
+Ind_NA = sapply(training_raw2, function(x) mean(is.na(x))) > 0.80
+training_raw3 = training_raw2[, Ind_NA == F]
+
+# Check Data Structure
+head(training_raw3, 2)
+
+# Observation: first 6 variables carry no info. Remove them too
+training_raw4 = training_raw3[,-(1:6)]
+
+# Check Data Again
+dim(training_raw4)
+```
+
+##### Create Training & Testing Set
+```{r}
+# Continue to use 70/30 to split
+inTrain = createDataPartition(y = training_raw4$classe, p = 0.7, list = F)
+training = training_raw4[inTrain,] 
+testing = training_raw4[-inTrain,]
+
+# Double-checking
+str(training)
+dim(training)
+```
+
+##### Building Model
+```{r}
+# Using RandomForest Model
+ctrl_rf = trainControl(method = "cv", number = 3, verboseIter = F)
+modFit_rf = train(classe ~ ., data = training,
+                  method = "rf", trControl = ctrl_rf, verbose = F)
+
+modFit_rf$finalModel
+# accuracy of the in-sample output is outstanding, but need to test with out-sample set
+```
+
+##### Out-Sample Testing
+```{r}
+confusionMatrix(testing$classe, predict(modFit_rf, newdata = testing))
+# similar accuracy to in-sample. outstanding result.
+```
+
+#### Result on Validation Set
+```{r}
+# Check Validation Set
+head(validation_raw)
+# Validation dataset doesn't have classe variable.
+
+predict(modFit_rf, newdata = validation_raw)
+```
